@@ -5,7 +5,7 @@ defmodule Immortal.Ghost do
   ## Rationale
 
   Suppose you need to track users' online status. You have one process
-  per user per connection, and automatically kill the process if the user 
+  per user per connection, and automatically kill the process if the user
   disconnects.
 
   This strategy is good as far as it goes, but it assumes that the user is
@@ -97,12 +97,12 @@ defmodule Immortal.Ghost do
       ...> Process.alive?(ghost)
       false
   """
-  @spec start(target_pid, milliseconds, fun, opts) :: {:ok, t}
+  @spec start(target_pid, milliseconds, fun, Keyword.t()) :: {:ok, t}
   def start(pid, timeout, fun \\ fn -> nil end)
       when is_pid(pid) and is_integer(timeout) and is_function(fun) do
     GenServer.start(__MODULE__, [pid, timeout, fun])
   end
-  
+
   def start(pid, timeout, fun, opts)
       when is_pid(pid) and is_integer(timeout) and is_function(fun) do
     GenServer.start(__MODULE__, [pid, timeout, fun], opts)
