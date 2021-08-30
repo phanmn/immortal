@@ -97,10 +97,15 @@ defmodule Immortal.Ghost do
       ...> Process.alive?(ghost)
       false
   """
-  @spec start(target_pid, milliseconds, fun) :: {:ok, t}
+  @spec start(target_pid, milliseconds, fun, opts) :: {:ok, t}
   def start(pid, timeout, fun \\ fn -> nil end)
       when is_pid(pid) and is_integer(timeout) and is_function(fun) do
     GenServer.start(__MODULE__, [pid, timeout, fun])
+  end
+  
+  def start(pid, timeout, fun, opts)
+      when is_pid(pid) and is_integer(timeout) and is_function(fun) do
+    GenServer.start(__MODULE__, [pid, timeout, fun], opts)
   end
 
   @doc """
