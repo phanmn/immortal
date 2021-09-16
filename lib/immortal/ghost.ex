@@ -123,10 +123,57 @@ defmodule Immortal.Ghost do
     GenServer.call(ghost, {:update, fun})
   end
 
+  @doc """
+  Change ghost's target process
+
+  ## Example
+      iex> {:ok, target} = Agent.start(fn -> nil end)
+      ...> {:ok, ghost} = Ghost.start(target, 100)
+      ...> Process.exit(target, :kill)
+      ...> {:ok, new_target} = Agent.start(fn -> nil end)
+      ...> {:ok, _} = ghost |> Ghost.change_target(new_target)
+      ...> :timer.sleep(200)
+      ...> Process.alive?(ghost)
+      true
+      ...> Process.exit(new_target, :kill)
+      ...> :timer.sleep(200)
+      ...> Process.alive?(ghost)
+      false
+  """
+  @spec change_target(t, pid()) :: {:ok, any}
+  def change_target(ghost, pid) when is_pid(ghost) and is_pid(pid) do
+    GenServer.call(ghost, {:change_target, pid})
+  end
+
   @doc false
   def init([source, timeout, fun]) do
-    Process.monitor(source)
-    {:ok, %{timeout: timeout, source: source, value: fun.()}}
+    monitor_ref = Process.monitor(source)
+
+    {:ok,
+     %{
+       timeout: timeout,
+       source: source,
+       value: fun.(),
+       monitor_ref: monitor_ref,
+       kill_after_ref: nil
+     }}
+  end
+
+  @doc false
+  def handle_call({:change_target, pid}, _from, state) do
+    state.monitor_ref
+    |> Process.demonitor()
+
+    if state.kill_after_ref !== nil do
+      state.kill_after_ref
+      |> :timer.cancel()
+    end
+
+    monitor_ref =
+      pid
+      |> Process.monitor()
+
+    {:reply, {:ok, state.value}, %{state | kill_after_ref: nil, monitor_ref: monitor_ref}}
   end
 
   @doc false
@@ -137,7 +184,10 @@ defmodule Immortal.Ghost do
 
   @doc false
   def handle_info({:DOWN, _ref, :process, _pid, _reason}, state) do
-    :timer.kill_after(state.timeout, self())
-    {:noreply, state}
+    with {:ok, kill_after_ref} <- :timer.kill_after(state.timeout, self()) do
+      {:noreply, %{state | kill_after_ref: kill_after_ref}}
+    else
+      _ -> {:noreply, state}
+    end
   end
 end
