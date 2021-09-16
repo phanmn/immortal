@@ -141,8 +141,9 @@ defmodule Immortal.Ghost do
       false
   """
   @spec change_target(t, pid()) :: {:ok, any}
-  def change_target(ghost, pid) when is_pid(ghost) and is_pid(pid) do
-    GenServer.call(ghost, {:change_target, pid})
+  def change_target(ghost, pid, fun \\ fn -> nil end)
+      when is_pid(ghost) and is_pid(pid) and is_function(fun) do
+    GenServer.call(ghost, {:change_target, pid, fun})
   end
 
   @doc false
@@ -160,7 +161,7 @@ defmodule Immortal.Ghost do
   end
 
   @doc false
-  def handle_call({:change_target, pid}, _from, state) do
+  def handle_call({:change_target, pid, fun}, _from, state) do
     state.monitor_ref
     |> Process.demonitor()
 
@@ -173,7 +174,9 @@ defmodule Immortal.Ghost do
       pid
       |> Process.monitor()
 
-    {:reply, {:ok, state.value}, %{state | kill_after_ref: nil, monitor_ref: monitor_ref}}
+    value = fun.()
+
+    {:reply, {:ok, value}, %{state | kill_after_ref: nil, monitor_ref: monitor_ref, value: value}}
   end
 
   @doc false
