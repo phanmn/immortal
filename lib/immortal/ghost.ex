@@ -146,6 +146,20 @@ defmodule Immortal.Ghost do
     GenServer.call(ghost, {:change_target, pid, fun})
   end
 
+  @doc """
+  Handle down
+  """
+  def handle_down(ghost, mfa) do
+    GenServer.call(ghost, {:handle_down, mfa})
+  end
+
+  @doc """
+  Handle stop
+  """
+  def handle_stop(ghost, mfa) do
+    GenServer.call(ghost, {:handle_stop, mfa})
+  end
+
   @doc false
   def init([source, timeout, fun]) do
     monitor_ref = Process.monitor(source)
@@ -156,7 +170,9 @@ defmodule Immortal.Ghost do
        source: source,
        value: fun.(),
        monitor_ref: monitor_ref,
-       kill_after_ref: nil
+       kill_after_ref: nil,
+       handle_down: nil,
+       handle_stop: nil
      }}
   end
 
@@ -167,7 +183,7 @@ defmodule Immortal.Ghost do
 
     if state.kill_after_ref !== nil do
       state.kill_after_ref
-      |> :timer.cancel()
+      |> Process.cancel_timer()
     end
 
     monitor_ref =
@@ -186,11 +202,34 @@ defmodule Immortal.Ghost do
   end
 
   @doc false
-  def handle_info({:DOWN, _ref, :process, _pid, _reason}, state) do
-    with {:ok, kill_after_ref} <- :timer.kill_after(state.timeout, self()) do
-      {:noreply, %{state | kill_after_ref: kill_after_ref}}
-    else
-      _ -> {:noreply, state}
+  def handle_call({:handle_down, mfa}, _from, state) do
+    {:reply, :ok, %{state | handle_down: mfa}}
+  end
+
+  @doc false
+  def handle_call({:handle_stop, mfa}, _from, state) do
+    {:reply, :ok, %{state | handle_stop: mfa}}
+  end
+
+  @doc false
+  def handle_info(:stop, state) do
+    if state.handle_stop !== nil do
+      {m, f, a} = state.handle_stop
+      apply(m, f, a)
     end
+
+    {:stop, :normal, state}
+  end
+
+  @doc false
+  def handle_info({:DOWN, _ref, :process, _pid, _reason}, state) do
+    kill_after_ref = Process.send_after(self(), :stop, state.timeout)
+
+    if state.handle_down !== nil do
+      {m, f, a} = state.handle_down
+      apply(m, f, a)
+    end
+
+    {:noreply, %{state | kill_after_ref: kill_after_ref}}
   end
 end
