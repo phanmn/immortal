@@ -232,4 +232,9 @@ defmodule Immortal.Ghost do
 
     {:noreply, %{state | kill_after_ref: kill_after_ref}}
   end
+
+  @doc false
+  def handle_info(_, state) do
+    {:noreply, state}
+  end
 end
