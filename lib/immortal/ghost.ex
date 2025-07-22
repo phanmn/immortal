@@ -192,7 +192,7 @@ defmodule Immortal.Ghost do
 
     value = fun.()
 
-    {:reply, {:ok, value}, %{state | kill_after_ref: nil, monitor_ref: monitor_ref, value: value}}
+    {:reply, {:ok, value}, %{state | kill_after_ref: nil, monitor_ref: monitor_ref, value: value, source: pid}}
   end
 
   @doc false
@@ -222,7 +222,7 @@ defmodule Immortal.Ghost do
   end
 
   @doc false
-  def handle_info({:DOWN, _ref, :process, _pid, _reason}, state) do
+  def handle_info({:DOWN, ref, :process, _pid, _reason}, %{monitor_ref: ref} = state) do
     kill_after_ref = Process.send_after(self(), :stop, state.timeout)
 
     if state.handle_down !== nil do
